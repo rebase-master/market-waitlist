@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+/*
+  Amanah design tokens — matched to Mal's brand palette (see DESIGN.md).
+  Periwinkle base, near-black ink, white surfaces. The aurora gradient is a
+  decorative accent ONLY: it sits behind the form card / as a soft hero glow,
+  never under text, so contrast stays safe (black-on-periwinkle ~= 15:1).
+*/
+@theme {
+  --color-periwinkle: #d0ddee;
+  --color-periwinkle-wash: #e4eaf5;
+  --color-surface: #ffffff;
+  --color-ink: #0a0a0a;
+  --color-ink-muted: #5b5f6b;
+  --color-error: #c11574;
+  --color-focus: #c658fd;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-periwinkle);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Restrained iridescent accent — decorative background wash only. */
+.aurora {
+  background-image: linear-gradient(135deg, #f4c7dd, #cbb4f1, #c658fd, #f9c9a9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
