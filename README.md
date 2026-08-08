@@ -169,6 +169,26 @@ live against Supabase), the full SEO layer (JSON-LD, sitemap, robots, hreflang),
 **`/ar` Arabic RTL route**, and the [live Vercel deploy](https://market-waitlist.vercel.app). The
 architecture/SEO/trade-offs write-up is in [`docs/PART2.md`](docs/PART2.md).
 
+## What I'd do next (with 2 more hours)
+
+The rule: **make the demand data trustworthy before making it bigger.** This page exists to measure
+appetite, so anything that hardens the measurement outranks anything that grows it.
+
+1. **Protect the signal (~45 min).** Sliding-window IP rate limit on `POST /api/waitlist` (Upstash
+   Ratelimit at the edge) + validate `referred_by` against existing codes with one indexed `SELECT`.
+   Today the appetite numbers are script-inflatable; this makes them defensible before any paid
+   traffic runs.
+2. **Close the referral loop (~30 min).** Show a live referral count on the success screen ("You've
+   referred 3 friends") — turns the WhatsApp share from a hopeful button into a visible score, the
+   cheapest K-factor lever available.
+3. **Make the measurement readable (~25 min).** Custom analytics events (signup, share-click, locale)
+   plus a `demand.sql` one-pager, so anyone on the growth team can read `demand_report` without me.
+4. **Deepen Arabic (~20 min).** An Arabic OG card so WhatsApp/Facebook shares render in-language, and
+   queue a native-speaker pass on the MSA copy.
+
+Still deliberately out, even with the extra time: admin dashboard, OTP verification, captcha, i18n
+framework — none of them changes what this test can measure.
+
 ## License
 
 MIT (placeholder — this is an assessment project).
