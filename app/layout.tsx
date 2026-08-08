@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
 import { Inter, Outfit } from 'next/font/google'
+import { SITE_URL as siteUrl } from '@/lib/site'
 import './globals.css'
 
 // Mal's brand faces, self-hosted by next/font (subset + swap) — zero render-blocking cost.
@@ -17,8 +18,6 @@ const inter = Inter({
   variable: '--font-inter',
   display: 'swap',
 })
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://amanah.example.com'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

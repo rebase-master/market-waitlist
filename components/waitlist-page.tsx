@@ -1,7 +1,6 @@
 import { WaitlistForm } from '@/components/waitlist-form'
 import type { Content } from '@/lib/content'
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://amanah.example.com'
+import { SITE_URL as siteUrl } from '@/lib/site'
 
 // Shared page body for both / (English) and /ar (Arabic). Language comes entirely
 // from `content`; direction is set via dir on the wrapper and CSS logical properties
