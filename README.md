@@ -6,7 +6,12 @@ captures qualified signups and writes them to Postgres (Supabase).
 
 <img src="docs/preview-desktop.png" alt="Amanah waitlist landing page" width="100%">
 
-<p align="center"><img src="docs/preview.png" alt="Amanah waitlist on mobile" width="300"></p>
+<p align="center">
+  <img src="docs/preview.png" alt="Amanah waitlist (English)" width="290">
+  &nbsp;&nbsp;
+  <img src="docs/preview-ar.png" alt="Amanah waitlist (Arabic, RTL)" width="290">
+</p>
+<p align="center"><em>English (<code>/</code>) and Arabic RTL (<code>/ar</code>).</em></p>
 
 > **Design note:** the palette (periwinkle base, black ink, iridescent aurora accent) and type
 > (Outfit + Inter) are matched to [Mal](https://mal.ai/)'s brand — palette only, original wordmark,
@@ -113,11 +118,13 @@ select * from private.demand_report;
 
 ## SEO
 
-Descriptive `<title>` + meta description, OpenGraph/Twitter cards, and `metadataBase`-driven
-canonical are in [`app/layout.tsx`](app/layout.tsx). Structured data (`Organization` + `WebPage`
-JSON-LD), `sitemap.ts`, `robots.ts`, and the Arabic `/ar` route with `hreflang` are the next commits
-(see below). `FAQPage` markup is deliberately omitted — Google restricted FAQ rich results to
-gov/health in 2023 — but the FAQ content stays for long-tail relevance.
+Implemented and verified against the production server: descriptive `<title>` + meta description,
+OpenGraph/Twitter cards, `metadataBase` canonical, `Organization` + `WebPage` JSON-LD
+(`areaServed: Egypt`), [`app/sitemap.ts`](app/sitemap.ts) and [`app/robots.ts`](app/robots.ts), and a
+bilingual **`hreflang`** pair (`en-EG` / `ar-EG` / `x-default`) across the `<head>` and the sitemap,
+pointing at the English `/` and Arabic `/ar` routes. `FAQPage` markup is deliberately omitted —
+Google restricted FAQ rich results to gov/health in 2023 — but the FAQ content stays for long-tail
+relevance.
 
 ## Project structure
 
@@ -141,9 +148,10 @@ DESIGN.md              # design system (tokens, type, rules)
 
 ## Build status
 
-Scaffold + schema + validation + page/form + API route are in and verified (build passes, 36 tests
-green). Still landing: SEO structured data + `sitemap.ts`/`robots.ts`, the Arabic `/ar` route, and
-the Vercel deploy. Tracked as the checklist below.
+In and verified (production build passes, 36 tests green): scaffold, schema/migration, shared
+validation, page + form with all interaction states, `POST /api/waitlist` with constraint-aware
+dedupe, the full SEO layer (JSON-LD, sitemap, robots, hreflang), and the bilingual **`/ar` Arabic
+RTL route**. Still landing: the **Vercel deploy** (live URL) and the written **`docs/PART2.md`** essay.
 
 ## License
 
