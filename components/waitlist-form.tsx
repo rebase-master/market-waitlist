@@ -25,6 +25,10 @@ export function WaitlistForm({ content }: { content: FormContent }) {
   const [banner, setBanner] = useState(false)
   const [refCode, setRefCode] = useState('')
   const [returning, setReturning] = useState(false)
+  // localStorage is client-only, so the server can't know if this visitor already
+  // joined. Gate on `mounted` and show a skeleton until we've checked — otherwise a
+  // returning visitor sees the form flash before the success card on every refresh.
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     try {
@@ -36,8 +40,12 @@ export function WaitlistForm({ content }: { content: FormContent }) {
       }
     } catch {
       // private mode: the form reappears on reload; the server dedupes anyway.
+    } finally {
+      setMounted(true)
     }
   }, [])
+
+  if (!mounted) return <FormSkeleton />
 
   // Localized message for a field error, keyed by the parseWaitlist / server key.
   const err = (key: keyof FormContent['errors']) =>
@@ -285,6 +293,28 @@ export function WaitlistForm({ content }: { content: FormContent }) {
         <p className="text-center text-[13px] text-ink-muted">{content.microcopy}</p>
       </div>
     </form>
+  )
+}
+
+// Shown until we've read localStorage — matches the form's shape so a returning
+// visitor never sees the form, and a new visitor gets a graceful loading state
+// instead of a layout jump.
+function FormSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6"
+    >
+      <div className="flex animate-pulse flex-col gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i}>
+            <div className="mb-1.5 h-3.5 w-24 rounded bg-black/10" />
+            <div className="h-[52px] w-full rounded-xl bg-black/[0.06]" />
+          </div>
+        ))}
+        <div className="mt-1 h-[52px] w-full rounded-full bg-black/10" />
+      </div>
+    </div>
   )
 }
 
