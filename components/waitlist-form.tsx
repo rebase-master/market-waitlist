@@ -133,7 +133,9 @@ export function WaitlistForm({ content }: { content: FormContent }) {
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#1FA855] px-5 font-display text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
+          // #11813F: WhatsApp-family green that clears WCAG AA for white 16px text
+          // (4.96:1; the brighter #1FA855 measured 3.09:1 and failed Lighthouse a11y).
+          className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#11813F] px-5 font-display text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
         >
           {content.share}
         </a>
