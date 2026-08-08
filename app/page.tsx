@@ -30,9 +30,42 @@ const FAQ = [
   },
 ]
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://amanah.example.com'
+
+// Organization + WebPage only — deliberately NOT FinancialService, which would
+// over-claim a licensed status the disclaimer explicitly denies.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}/#organization`,
+      name: 'Amanah',
+      url: siteUrl,
+      description: 'Shariah-compliant, interest-free consumer financing for Egypt.',
+      areaServed: { '@type': 'Country', name: 'Egypt' },
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${siteUrl}/#webpage`,
+      url: `${siteUrl}/`,
+      name: 'Amanah — Shariah-compliant financing for Egypt',
+      description:
+        'Halal, interest-free financing built for Egypt. Join the waitlist for early access.',
+      inLanguage: 'en-EG',
+      isPartOf: { '@id': `${siteUrl}/#organization` },
+      about: { '@id': `${siteUrl}/#organization` },
+    },
+  ],
+}
+
 export default function Home() {
   return (
     <div className="relative min-h-dvh overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Restrained aurora glow — decorative, sits behind the form, never under text. */}
       <div
         aria-hidden

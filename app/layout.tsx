@@ -38,6 +38,14 @@ export const metadata: Metadata = {
     title: 'Amanah — Shariah-compliant financing for Egypt',
     description: 'Halal, interest-free financing built for Egypt. Join the waitlist.',
   },
+  alternates: {
+    canonical: '/',
+    languages: {
+      'en-EG': '/',
+      'ar-EG': '/ar',
+      'x-default': '/',
+    },
+  },
   robots: { index: true, follow: true },
 }
 
