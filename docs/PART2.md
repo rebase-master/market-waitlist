@@ -158,7 +158,7 @@ what got **cut** and sequenced:
 | Palette matched to Mal's brand | Chose | Signals brand awareness to the evaluator; executed with restraint so the periwinkle/aurora reads as intentional, not generic pastel-fintech. |
 | SSR for `/` + `/ar` (not static-export) | Chose | A correct per-locale `<html lang>`/`dir` needs the route at render time. Static-exporting both with one hardcoded `lang` let browsers auto-translate the Arabic page into a broken English-in-RTL hybrid. SSR fixes it for crawlers and browsers; the per-request cost on Vercel is negligible. |
 
-**With 2 more hours** (also in the README): rate-limit + `referred_by` validation to protect the
+**With 2 more hours:** rate-limit + `referred_by` validation to protect the
 demand signal; the referral loop's position/live-count on the success screen; analytics events + a
 read surface over `demand_report`; and an Arabic-parity polish pass (native copy review, Arabic OG
 card, locale-segmented layout so `<html lang>` matches per route).
