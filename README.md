@@ -50,13 +50,14 @@ SEO reasoning is in [`docs/PART2.md`](docs/PART2.md).
 | Tests | **Vitest** | Fast, covers the validation + DB-error logic (the write path's heart) |
 | Hosting | **Vercel** | First-class Next.js SSR/SSG + serverless routes |
 
-**Rendering:** the two localized pages (`/`, `/ar`) are **server-rendered** — a deliberate trade of
-build-time static for i18n correctness, so each locale gets a correct `<html lang>`/`dir` (a
-client-side lang fix would leave crawlers and the browser's translate heuristic seeing the wrong
-language). The HTML is fully crawlable and the client bundle is unchanged (~119 kB first load); the
-SEO files (`sitemap.xml`, `robots.txt`) stay static. The one other server endpoint is the route
-handler (`POST /api/waitlist`). The build intentionally does **not** use `output: 'export'`, which
-would drop the API route. This is what carries the Lighthouse mobile target (≥ 85).
+**Rendering:** both localized pages are **statically prerendered**, each under its own route-group
+root layout — `app/(en)` and `app/(ar)` — so `/` ships `<html lang="en" dir="ltr">` and `/ar` ships
+`<html lang="ar" dir="rtl">` with all metadata in the `<head>` at build time. (An earlier
+middleware-based approach made the layout dynamic, which caused Next to *stream* metadata into the
+body — invisible to head-only crawlers; route groups solve lang/dir *and* keep everything static.)
+The only server code is the route handler (`POST /api/waitlist`). The build intentionally does
+**not** use `output: 'export'`, which would drop the API route. This is what carries the Lighthouse
+mobile target (≥ 85).
 
 ## Quick start
 
