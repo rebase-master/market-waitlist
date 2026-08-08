@@ -98,3 +98,14 @@ create view private.demand_report as
   group by market, financing_purpose, referral_source, utm_source;
 
 comment on view private.demand_report is 'Demand sliced by the axes growth measures. Lives in a non-exposed schema so it is never served over the anon REST API.';
+
+-- ── Grants ───────────────────────────────────────────────────────────────────
+-- Make this migration self-contained regardless of the project's "Automatically
+-- expose new tables" setting. The server route (service_role) must insert signups
+-- and read the private demand report; anon/authenticated are granted nothing here
+-- and are additionally blocked by RLS. If you left auto-expose ON, these grants are
+-- simply idempotent no-ops.
+grant usage  on schema  public            to service_role;
+grant select, insert on waitlist_signups  to service_role;
+grant usage  on schema  private           to service_role;
+grant select on private.demand_report     to service_role;
