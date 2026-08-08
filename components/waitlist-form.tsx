@@ -1,35 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  FINANCING_PURPOSES,
-  REFERRAL_SOURCES,
-  parseWaitlist,
-  type FinancingPurpose,
-  type ReferralSource,
-} from '@/lib/validation'
+import { FINANCING_PURPOSES, REFERRAL_SOURCES, parseWaitlist } from '@/lib/validation'
+import type { FormContent } from '@/lib/content'
 
 type Status = 'idle' | 'sending' | 'done' | 'error'
-
-const REFERRAL_LABELS: Record<ReferralSource, string> = {
-  friend_family: 'A friend or family member',
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  search: 'Google / search',
-  news: 'A news site or blog',
-  other: 'Somewhere else',
-}
-
-const PURPOSE_LABELS: Record<FinancingPurpose, string> = {
-  electronics: 'Electronics (phone, laptop)',
-  home_appliances: 'Home appliances',
-  furniture: 'Furniture',
-  education: 'Education / tuition',
-  medical: 'Medical',
-  vehicle: 'Vehicle',
-  other: 'Something else',
-}
 
 const STORAGE_KEY = 'amanah_waitlist'
 
@@ -37,7 +12,7 @@ const inputClass =
   'h-[52px] w-full rounded-xl border border-black/10 bg-white px-4 text-[16px] text-ink outline-none placeholder:text-ink-muted/70 focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/60'
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink'
 
-export function WaitlistForm() {
+export function WaitlistForm({ content }: { content: FormContent }) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -46,8 +21,8 @@ export function WaitlistForm() {
   const [website, setWebsite] = useState('') // honeypot
 
   const [status, setStatus] = useState<Status>('idle')
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [banner, setBanner] = useState('')
+  const [errorKeys, setErrorKeys] = useState<Record<string, boolean>>({})
+  const [banner, setBanner] = useState(false)
   const [refCode, setRefCode] = useState('')
   const [returning, setReturning] = useState(false)
 
@@ -60,9 +35,13 @@ export function WaitlistForm() {
         setStatus('done')
       }
     } catch {
-      // private mode: the form just shows again on reload; the server dedupes anyway.
+      // private mode: the form reappears on reload; the server dedupes anyway.
     }
   }, [])
+
+  // Localized message for a field error, keyed by the parseWaitlist / server key.
+  const err = (key: keyof FormContent['errors']) =>
+    errorKeys[key] ? content.errors[key] : undefined
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -71,16 +50,15 @@ export function WaitlistForm() {
     const raw = { fullName, email, phone, referralSource, financingPurpose, website }
     const check = parseWaitlist(raw)
     if (!check.ok) {
-      setErrors(check.errors)
+      setErrorKeys(Object.fromEntries(Object.keys(check.errors).map((k) => [k, true])))
       setStatus('error')
       return
     }
 
-    setErrors({})
-    setBanner('')
+    setErrorKeys({})
+    setBanner(false)
     setStatus('sending')
 
-    // Attribution captured from the URL: ?ref= referral code + any UTM params.
     const params = new URLSearchParams(window.location.search)
     const payload = {
       ...raw,
@@ -98,16 +76,15 @@ export function WaitlistForm() {
       })
       const data = (await res.json().catch(() => ({}))) as {
         refCode?: string
-        error?: string
         errors?: Record<string, string>
       }
       if (!res.ok) {
         if (data.errors) {
-          setErrors(data.errors)
+          setErrorKeys(Object.fromEntries(Object.keys(data.errors).map((k) => [k, true])))
           setStatus('error')
           return
         }
-        throw new Error(data.error ?? 'Could not save your details. Please try again.')
+        throw new Error('server')
       }
       const code = data.refCode ?? ''
       setRefCode(code)
@@ -117,8 +94,8 @@ export function WaitlistForm() {
         /* ignore storage failures */
       }
       setStatus('done')
-    } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Could not save your details.')
+    } catch {
+      setBanner(true)
       setStatus('error')
     }
   }
@@ -126,10 +103,7 @@ export function WaitlistForm() {
   if (status === 'done') {
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const shareUrl = refCode ? `${origin}/?ref=${refCode}` : origin
-    const shareText =
-      `أنا انضممت لقائمة انتظار أمانة — تمويل حلال بدون فوائد. انضم لي:\n` +
-      `I just joined the Amanah waitlist — halal, interest-free financing for Egypt. Join me: ${shareUrl}`
-    const waHref = `https://wa.me/?text=${encodeURIComponent(shareText)}`
+    const waHref = `https://wa.me/?text=${encodeURIComponent(content.shareText.replace('{url}', shareUrl))}`
 
     return (
       <div role="status" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
@@ -142,11 +116,9 @@ export function WaitlistForm() {
           </span>
           <div>
             <p className="font-display text-lg font-bold text-ink">
-              {returning ? 'You’re already on the list.' : 'You’re on the list.'}
+              {returning ? content.successReturning : content.successTitle}
             </p>
-            <p className="mt-1 text-[15px] leading-relaxed text-ink-muted">
-              We’ll message you when early access opens in Egypt.
-            </p>
+            <p className="mt-1 text-[15px] leading-relaxed text-ink-muted">{content.successBody}</p>
           </div>
         </div>
         <a
@@ -155,11 +127,9 @@ export function WaitlistForm() {
           rel="noopener noreferrer"
           className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#1FA855] px-5 font-display text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
         >
-          Share on WhatsApp
+          {content.share}
         </a>
-        <p className="mt-2 text-center text-[13px] text-ink-muted">
-          Move up the list — invite a friend.
-        </p>
+        <p className="mt-2 text-center text-[13px] text-ink-muted">{content.shareHint}</p>
       </div>
     )
   }
@@ -187,7 +157,7 @@ export function WaitlistForm() {
       <div className="flex flex-col gap-4">
         <div>
           <label htmlFor="fullName" className={labelClass}>
-            Full name
+            {content.fullName}
           </label>
           <input
             id="fullName"
@@ -197,16 +167,16 @@ export function WaitlistForm() {
             maxLength={120}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            aria-invalid={Boolean(errors.fullName) || undefined}
+            aria-invalid={errorKeys.fullName || undefined}
             className={inputClass}
-            placeholder="Your name"
+            placeholder={content.fullNamePlaceholder}
           />
-          {errors.fullName && <FieldError id="err-fullName">{errors.fullName}</FieldError>}
+          {err('fullName') && <FieldError>{err('fullName')}</FieldError>}
         </div>
 
         <div>
           <label htmlFor="phone" className={labelClass}>
-            Mobile number
+            {content.phone}
           </label>
           <input
             id="phone"
@@ -214,18 +184,19 @@ export function WaitlistForm() {
             type="tel"
             inputMode="tel"
             autoComplete="tel"
+            dir="ltr"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            aria-invalid={Boolean(errors.phone) || undefined}
+            aria-invalid={errorKeys.phone || undefined}
             className={inputClass}
-            placeholder="010 1234 5678"
+            placeholder={content.phonePlaceholder}
           />
-          {errors.phone && <FieldError id="err-phone">{errors.phone}</FieldError>}
+          {err('phone') && <FieldError>{err('phone')}</FieldError>}
         </div>
 
         <div>
           <label htmlFor="email" className={labelClass}>
-            Email <span className="font-normal text-ink-muted">(optional if you gave a number)</span>
+            {content.email} <span className="font-normal text-ink-muted">{content.emailOptional}</span>
           </label>
           <input
             id="email"
@@ -233,48 +204,47 @@ export function WaitlistForm() {
             type="email"
             inputMode="email"
             autoComplete="email"
+            dir="ltr"
             maxLength={254}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            aria-invalid={Boolean(errors.email) || undefined}
+            aria-invalid={errorKeys.email || undefined}
             className={inputClass}
-            placeholder="you@email.com"
+            placeholder={content.emailPlaceholder}
           />
-          {errors.email && <FieldError id="err-email">{errors.email}</FieldError>}
+          {err('email') && <FieldError>{err('email')}</FieldError>}
         </div>
 
-        {errors.contact && <FieldError id="err-contact">{errors.contact}</FieldError>}
+        {err('contact') && <FieldError>{err('contact')}</FieldError>}
 
         <div>
           <label htmlFor="referralSource" className={labelClass}>
-            How did you hear about us?
+            {content.referral}
           </label>
           <select
             id="referralSource"
             name="referralSource"
             value={referralSource}
             onChange={(e) => setReferralSource(e.target.value)}
-            aria-invalid={Boolean(errors.referralSource) || undefined}
+            aria-invalid={errorKeys.referralSource || undefined}
             className={inputClass}
           >
             <option value="" disabled>
-              Choose one…
+              {content.referralPlaceholder}
             </option>
             {REFERRAL_SOURCES.map((s) => (
               <option key={s} value={s}>
-                {REFERRAL_LABELS[s]}
+                {content.referralOptions[s]}
               </option>
             ))}
           </select>
-          {errors.referralSource && (
-            <FieldError id="err-referralSource">{errors.referralSource}</FieldError>
-          )}
+          {err('referralSource') && <FieldError>{err('referralSource')}</FieldError>}
         </div>
 
         <div>
           <label htmlFor="financingPurpose" className={labelClass}>
-            What would you use financing for?{' '}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            {content.purpose}{' '}
+            <span className="font-normal text-ink-muted">{content.purposeOptional}</span>
           </label>
           <select
             id="financingPurpose"
@@ -283,10 +253,10 @@ export function WaitlistForm() {
             onChange={(e) => setFinancingPurpose(e.target.value)}
             className={inputClass}
           >
-            <option value="">Prefer not to say</option>
+            <option value="">{content.purposePreferNot}</option>
             {FINANCING_PURPOSES.map((p) => (
               <option key={p} value={p}>
-                {PURPOSE_LABELS[p]}
+                {content.purposeOptions[p]}
               </option>
             ))}
           </select>
@@ -294,7 +264,7 @@ export function WaitlistForm() {
 
         {banner && (
           <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
-            {banner}
+            {content.errors.server}
           </p>
         )}
 
@@ -305,24 +275,22 @@ export function WaitlistForm() {
         >
           {status === 'sending' ? (
             <>
-              <Spinner /> Adding you…
+              <Spinner /> {content.ctaSending}
             </>
           ) : (
-            'Join the waitlist'
+            content.cta
           )}
         </button>
 
-        <p className="text-center text-[13px] text-ink-muted">
-          No spam. We’ll only message you about early access.
-        </p>
+        <p className="text-center text-[13px] text-ink-muted">{content.microcopy}</p>
       </div>
     </form>
   )
 }
 
-function FieldError({ id, children }: { id: string; children: React.ReactNode }) {
+function FieldError({ children }: { children: React.ReactNode }) {
   return (
-    <p id={id} role="alert" className="mt-1.5 text-[13px] font-medium text-error">
+    <p role="alert" className="mt-1.5 text-[13px] font-medium text-error">
       {children}
     </p>
   )
