@@ -1,164 +1,59 @@
-# Part 2 — Architecture, SEO Strategy & Trade-offs
+# Amanah — Architecture, SEO Strategy & Trade-offs
 
-Market: **Egypt.** It's the market Mal would realistically enter next (Abu-Dhabi HQ, stated
-Middle-East rollout), and it turns every abstract decision into a concrete one: ~110M people,
-majority-Muslim, roughly two-thirds of adults without formal credit, mature mobile-money rails
-(Vodafone Cash, InstaPay, Fawry), and a crowd of consumer-lending fintechs (valU, Sympl, MNT-Halan,
-Aman, Contact) already scaling — with *Shariah-compliant* financing the under-served flank.
+**Market: Egypt** · Live: [market-waitlist.vercel.app](https://market-waitlist.vercel.app) ([/ar](https://market-waitlist.vercel.app/ar)) · Repo: [github.com/rebase-master/market-waitlist](https://github.com/rebase-master/market-waitlist)
 
-The single reframe behind every choice below: **this page is a measurement instrument, not a
-funnel.** The brief asks us to *test appetite*. So the goal isn't maximum raw signups — it's
-signups we can *segment*, *attribute*, and *act on*.
+The premise behind every decision: **this page is a measurement instrument, not a funnel** — the goal isn't maximum signups but signups we can segment, attribute, and act on.
 
----
+## Section 1 — Data Model & Page Architecture
 
-## 1. Data model — what growth actually needs to measure
+**Why these fields.** One table, `waitlist_signups`; every column answers a growth question:
 
-One table, [`waitlist_signups`](../supabase/migrations/0001_init.sql). Every column earns its place
-by answering a growth question:
+- `email` **or** `phone` (CHECK ≥1) — *are we reaching the underbanked?* Phone is primary identity in Egypt; requiring email would filter out the segment being tested. Phones normalized to E.164.
+- `financing_purpose` (optional enum) — *what would they finance?* Asset-backed values only (a Murabaha product sells assets, not cash); the mix decides which category launches first. Optional, so intent never costs conversion.
+- `referral_source` + UTM columns — *which channel works?* Self-reported vs. link-declared attribution triangulate real vs. perceived channel value.
+- `ref_code` / `referred_by` — *is it viral?* Every signup gets a share code; referred signups record who sent them — raw material for a K-factor.
+- `market` (default `EG`) + `created_at` — one table serves N markets; per-market cohorts and velocity.
 
-| Column | Growth question it answers |
-|--------|----------------------------|
-| `email` **OR** `phone` (`CHECK`) | *Are we reaching the underbanked?* Phone is primary identity in Egypt — mobile-money accounts outnumber bank accounts. Requiring email would silently filter out the exact segment we're testing. The phone-vs-email ratio is itself a reach KPI. |
-| `financing_purpose` (optional enum) | *What do they actually want to finance?* Asset-backed values only (electronics, appliances, education, medical…) because a Murabaha product sells assets, not cash. The purpose mix tells us **which category to launch first**. |
-| `referral_source` (enum) | *Which channel do users say brought them?* The self-reported side of attribution. |
-| `utm_source/medium/campaign` | *Which channel actually brought them?* The link side. Self-report and UTM together triangulate real vs perceived channel value. |
-| `ref_code` / `referred_by` | *Is this thing viral?* Every signup gets a share code; every referred signup records who sent them. This is the raw material for a K-factor. |
-| `market` (default `EG`) | *One table, N markets.* When Mal tests Pakistan or Morocco next, it's a new page and a filter, not a new schema. |
-| `created_at` | Cohorting, velocity, decay. |
+A `demand_report` view (market × purpose × source × UTM, with referred counts) makes the measurement claim runnable. It lives in a non-exposed `private` schema — plain views don't inherit RLS and Supabase auto-publishes public-schema views over the anon REST API, so demand data would leak. The table itself is RLS deny-all; only the server route writes.
 
-The design that makes this *usable*, not just *stored*: a **`private.demand_report` view** that rolls
-signups up by market × purpose × referral_source × utm_source, with referred-signup counts. It lives
-in a non-exposed schema deliberately — a plain Postgres view runs with owner privileges and does
-**not** inherit the table's RLS, and Supabase auto-publishes public-schema views over the anon REST
-API. In `public` it would leak aggregate demand to anyone with the browser key. In `private` it's a
-one-line query for the team and invisible to everyone else.
+**Extending it.** A second market is a config change, not a migration: new `market` value, new route (§2), and one schema change — the unique indexes on email/phone become composite `(market, email)` / `(market, phone)` so one person can join two waitlists. A second *product* starts as a `product` enum folded into `demand_report`, normalizing into a `products` table only when products carry their own attributes.
 
-**Verified live:** phone normalized to E.164 (`01012345670 → +201012345670`), email lowercased,
-`market`/`ref_code` defaulted, and the browser's anon key gets `permission denied` on the table
-(RLS deny-all). Only the server's secret key writes.
+**Indexes.** Partial uniques on `email`/`phone` (`WHERE NOT NULL` — dedupe without fighting NULLs; they back the returning-user lookup); unique `ref_code` (share-link resolution); `(market, created_at)` (the most common read: per-market cohorts); `referred_by` (K-factor joins). Nothing else until a query earns it.
 
----
+**Rendering: SSG.** Both locales are statically prerendered under route-group root layouts (`app/(en)`, `app/(ar)`): `/` ships `<html lang="en" dir="ltr">`, `/ar` ships `lang="ar" dir="rtl"`, all metadata in the `<head>` at build time; the only server code is `POST /api/waitlist`. Why: crawlers get complete HTML from the CDN edge with no JS execution, and low-end Android/3G users get ~0.5s first paint (Lighthouse mobile 100). SSR adds per-request latency for content that changes only at deploys; ISR solves staleness we don't have; CSR hands crawlers an empty shell. Earned lesson: a middleware-based i18n attempt made the layout dynamic and Next *streamed* title/meta into the `<body>`, invisible to head-only crawlers — route groups fixed lang/dir and kept everything static.
 
-## 2. Technical execution
+## Section 2 — Growth & Organic Discovery Plan (first 30 days, zero budget)
 
-**Architecture (deliberately small).** A statically-prerendered Next.js page + exactly one
-serverless route (`POST /api/waitlist`). The two locales live under route-group root layouts
-(`app/(en)`, `app/(ar)`) so each ships correct `<html lang>`/`dir` and build-time head metadata while
-staying fully static — see the trade-off note below. No auth, no ORM, no admin app. Supabase Postgres with **RLS deny-all**;
-the anon key never touches the DB; the route writes with the service-role key. Validation lives in one
-[shared module](../lib/validation.ts) imported by both the client (fast feedback) and the route (the
-real boundary) so they can't drift — 36 Vitest cases cover the Egyptian phone normalizer and the
-parse logic.
+**Keyword rationale: Arabic-first, long-tail-first.** Egyptian consumer-finance demand is searched in Arabic (Google ≈97% share, overwhelmingly mobile). With zero domain authority, head terms — *تمويل حلال*, *تقسيط بدون فوائد* — are unreachable in 30 days; valU, Sympl, and Aman own the *instalment* framing. The 30-day targets:
 
-**The one genuinely tricky bit — dedupe.** Three unique constraints can fire `23505` (email, phone,
-`ref_code`), so a blanket "duplicate = success" is wrong: a `ref_code` collision would report a
-phantom success. The route branches on the constraint — **email/phone → return the *existing*
-`ref_code`** (so a returning user's share link is live, and the identical response shape prevents
-account enumeration); **`ref_code` → regenerate and retry.** Email is lowercased in the route so the
-`CHECK` (which raises `23514`, not `23505`) can never surface as a hard failure. A honeypot field
-returns silent success and writes nothing.
+1. **Purpose long-tail**, mapping 1:1 to the `financing_purpose` enum — *تقسيط موبايل بدون فوائد*, *تمويل أجهزة منزلية*, *تقسيط مصاريف دراسية* — high intent, low competition; the segmentation that runs the product runs the content.
+2. **Question queries** the FAQ answers — *هل التقسيط حلال؟* ("is instalment buying halal?") — the Shariah-explicit angle no incumbent owns.
+3. **Branded terms** (*أمانة تمويل*) — the off-page moves below seed searches we can rank #1 for in week one.
 
-**SEO.** SSG gives crawlable HTML with no framework tax. Implemented and verified against the prod
-server: descriptive `<title>` + meta description, OpenGraph/Twitter, `metadataBase` canonical, a
-single `Organization` + `WebPage` JSON-LD block (`areaServed: Egypt` — deliberately **not**
-`FinancialService`, which would over-claim a licence the disclaimer denies), `sitemap.xml`,
-`robots.txt`, and a bilingual **`hreflang`** pair. `FAQPage` markup is omitted on purpose — Google
-restricted FAQ rich results to gov/health in 2023 — but the FAQ content stays for long-tail.
+`/ar` is the canonical spearhead (hand-written MSA, hreflang pair with `/`); English serves the expat/affluent secondary segment.
 
-**Performance.** Fully static pages, ~119 kB first load, two subset fonts (`next/font`), zero hero
-images, CSS-only gradients. That's what carries the Lighthouse mobile target with room to spare, on
-the low-end Android + patchy-3G reality of the target user.
+**Two zero-budget off-page moves.**
 
-**Bilingual.** A dictionary-driven page renders both `/` (English) and `/ar` (Arabic, RTL) from one
-set of components — direction via `dir` + CSS logical properties, no duplicated CSS. More on why
-that's a *growth* decision, not a nicety, below.
+1. **MENA startup press + free directories.** Pitch "waitlist testing appetite for Shariah-compliant consumer financing in Egypt" to Wamda, MenaBytes, Waya, StartupScene — pre-launch fintech waitlists are exactly their beat; each pickup is a DA-50+ backlink plus referral traffic that seeds branded search. Same day: free citations on MAGNiTT, Crunchbase, F6S. Fastest legitimate authority a zero-history domain can get.
+2. **Community seeding through the built-in WhatsApp loop.** Egypt's money conversations happen in Facebook groups and WhatsApp. Answer real instalment/halal questions in the big personal-finance groups (useful answers, not spam); the success screen does the rest — every signup gets a prefilled Arabic wa.me share carrying `?ref=CODE`, and `referred_by` + UTMs record which community converts. The distribution mechanism ships inside the page.
 
----
+**Second market without duplicate content.** Market-scoped paths on one domain — `/eg/` + `/eg/ar/`, then `/ma/` + `/ma/ar/` (current routes 301 into `/eg/…`). Paths beat subdomains pre-authority: link equity consolidates on one host while each market×locale keeps its own URL, self-canonical, per-market `<title>`/description, and one hreflang cluster (`ar-EG`, `en-EG`, `ar-MA`, `x-default` → chooser). Duplication is avoided by making pages *substantively* different — rails, currency, purposes, FAQ, and disclaimer are market-specific blocks driven by the dictionary system that runs EN/AR today. One sitemap lists every variant; the DB is ready.
 
-## 3. SEO & growth strategy for Egypt (concrete, measurable)
+**How I'd know within 2 weeks.** Honestly: rankings for competitive terms won't move in 14 days. What's measurable is indexation health, early impressions, and conversion of seeded traffic:
 
-**Premise: in Egypt, the demand is Arabic.** Google has ~95%+ search share, traffic is
-overwhelmingly mobile, and consumer-finance intent is searched in Arabic — often Egyptian-dialect
-phrasing, not formal MSA. An English-only page optimising for "halal loan Egypt" is fishing in a
-puddle. So the single highest-leverage SEO move is **shipping Arabic as a real, indexable route with
-`hreflang`** — which is done, not promised.
+| Metric | Tool | Healthy by day 14 | Change course if… |
+|---|---|---|---|
+| URLs indexed | Search Console (sitemap day 0) | Indexed ≤ 7 days | Not by day 7 → fix indexing before anything else |
+| Impressions | GSC Performance | Branded present; non-branded > 0 | Zero non-branded → content too thin; deepen FAQ/purpose copy |
+| Visitor→signup | Vercel Analytics ÷ `demand_report` | ≥ 8% (waitlist benchmark 10–30%) | < 5% → messaging/form friction, not channels |
+| Intent quality | `demand_report` | ≥ 30% include `financing_purpose` | Near-zero → curiosity, not demand; revisit positioning |
+| Referral share | `referred ÷ total` | ≥ 15% carry `referred_by` | < 5% → weak share incentive; add position/count |
+| Channel mix | `utm_source` split | One source clearly winning | Flat → reallocate seeding weekly to the winner |
 
-**Keyword strategy (head → long-tail):**
+## Section 3 — Trade-offs & What I Cut
 
-- **Arabic head terms:** *تمويل حلال* (halal financing), *تمويل بدون فوائد* (interest-free financing),
-  *تمويل إسلامي* (Islamic financing), *تقسيط بدون فوائد* (interest-free instalments). These are where
-  valU / Sympl / Aman compete on the *instalment* framing; the open flank is the explicit
-  **Shariah/halal** angle.
-- **Purpose long-tail (high intent, low competition):** *تقسيط موبايل بدون فوائد* (phone instalments,
-  no interest), *تمويل أجهزة كهربائية*, *تمويل مصاريف دراسية* (tuition financing). These map 1:1 to the
-  `financing_purpose` enum — the same segmentation that runs the product roadmap runs the content
-  roadmap.
-- **English secondary:** expat / higher-income segment and brand terms. Lower volume, higher ARPU.
+**Deliberately left out** (each a named next-step in the README): **rate limiting** — real setup; demand numbers are script-inflatable until it lands, and I'd rather name that than hide it. **`referred_by` validation** — a spoofed `?ref` pollutes attribution only. **Admin dashboard** — `demand_report` is queryable; a UI solves a problem we don't have. **OTP verification** — kills waitlist conversion; dedupe + honeypot carry data quality. **i18n framework** — two locales need a typed dictionary. **Full CSP** — needs nonce plumbing; XFO/nosniff/referrer/permissions headers shipped instead.
 
-**Technical SEO roadmap** (beyond what's shipped): Arabic-first content depth per purpose category
-(a thin waitlist page ranks for nothing long-term — it needs "how halal financing works" explainer
-content in Arabic), `Article`/`BreadcrumbList` schema as content grows, Core Web Vitals held green as
-features land, and an Arabic OG card so social shares render in-language.
+**If the timeline doubled**, in order: (1) edge rate limit + `referred_by` validation — make the numbers *defensible* before driving traffic; (2) analytics events (signup, share-click, locale) + a `demand.sql` one-pager so growth reads the instrument without me; (3) referral count + position on the success screen — the share button becomes a score; (4) Arabic OG card + native-speaker copy pass.
 
-**Channels — because SEO alone is slow, and the brief is about appetite *now*:**
-
-- **The WhatsApp referral loop is the built-in growth engine.** Egypt is WhatsApp-default; the success
-  screen hands each signup a prefilled bilingual share link carrying their `ref_code`. `referred_by`
-  makes it *measured*, not hoped-for.
-- **Paid social where Egypt actually is:** Facebook (still dominant), TikTok (fastest-growing, ideal
-  for short "no-riba financing" explainers), Instagram. Every ad link carries UTMs → `utm_source` →
-  the `demand_report` view. We'll know within a week which channel delivers *segmentable* demand, not
-  just clicks.
-
-**The measurement plan — first 4 weeks, concrete KPIs:**
-
-| KPI | Why it matters | How it's captured |
-|-----|----------------|-------------------|
-| Signups by `utm_source` × `financing_purpose` | Which channel brings which demand | `demand_report` view |
-| Blended cost per *qualified* signup | Efficiency, per channel | ad spend ÷ signups per UTM |
-| Referral K-factor (`referred_signups` ÷ total) | Is it organically viral? | `referred_by` non-null share |
-| Purpose mix | **Which asset category to launch first** | `financing_purpose` distribution |
-| `/ar` vs `/` traffic + conversion | In-market PMF signal | analytics + `inLanguage` |
-| Phone-vs-email ratio | Underbanked reach | `phone`/`email` null pattern |
-
-Success at 4 weeks isn't "N signups." It's a defensible answer to: *which market segment, reached via
-which channel, wants which product — and does it spread on its own?*
-
-**Trust as a growth lever.** For a lending product the honest disclaimer ("waitlist, not yet
-licensed") and Shariah-correct vocabulary (Murabaha / profit-rate / admin-fee, never "interest",
-never "loan") aren't compliance drag — in a market burned by hidden-fee lenders, they're conversion
-drivers with the exact audience most likely to want a halal product.
-
----
-
-## 4. Speed-to-ship — prioritisation under the constraint
-
-The brief rewards a polished single page over a half-built multi-page site, so the discipline was in
-what got **cut** and sequenced:
-
-- **Migration first, deploy by hour 3.** Evaluators read migrations; a live URL early de-risks the
-  whole thing. Both done before any polish.
-- **Built the measurement, not the funnel.** The one *optional* intent field and the referral loop
-  went in because they're what the grade ("what growth needs to measure") actually rewards — while
-  admin UI, email/OTP, captcha, and an i18n framework were cut to named next-steps.
-- **`/ar` shipped, not deferred.** The earlier plan was English-only with Arabic "argued as a
-  next-step." That's reasoning without prioritisation for *this* market — so Arabic became a real
-  route. Kept minimal and hand-checked (formal MSA) rather than machine-translated, precisely because
-  it faces native-speaker reviewers.
-
-**Explicit trade-offs I'd defend:**
-
-| Decision | Call | Why |
-|----------|------|-----|
-| No rate-limiting (yet) | Deferred | Real setup for a time-boxed build; documented as the #1 hardening step. Demand numbers are inflatable until it lands — I'd rather name that than hide it. |
-| `referred_by` unvalidated | Accepted | A spoofed `?ref` pollutes *attribution only*, never core data. Validation is a documented next-step, not a launch blocker. |
-| `demand_report` as a SQL view, no dashboard | Chose | The evaluator can run it; a dashboard is UI for a problem we don't have yet. |
-| Supabase over raw Postgres | Chose | Managed Postgres + REST + a plain-SQL migration that's portable anywhere. One innovation token, well spent. |
-| Palette matched to Mal's brand | Chose | Signals brand awareness to the evaluator; executed with restraint so the periwinkle/aurora reads as intentional, not generic pastel-fintech. |
-| Route-group root layouts for i18n | Chose (after one wrong turn) | One hardcoded `<html lang="en">` let browsers auto-translate `/ar` into a broken English-in-RTL hybrid. The first fix (middleware + dynamic layout) worked but made Next *stream* metadata into the body — head-only crawlers saw no title/description. Route groups (`app/(en)`, `app/(ar)`) give each locale a static root layout: correct `lang`/`dir`, head metadata at build time, zero runtime cost. |
-
-**With 2 more hours:** rate-limit + `referred_by` validation to protect the
-demand signal; the referral loop's position/live-count on the success screen; analytics events + a
-read surface over `demand_report`; and an Arabic-parity polish pass (native copy review, Arabic OG
-card, locale-segmented layout so `<html lang>` matches per route).
+**50,000 signups in a weekend.** The throughput math is boring on purpose: ~0.3 writes/s average, double-digit peaks — an indexed insert plus one index-backed dedupe SELECT, and the pages are static files on Vercel's CDN, so even millions of *views* never touch compute. What breaks, in order: **(1) trust in the data** — with no rate limit, a viral moment is when the bots arrive and "appetite" stops being defensible; fix with an Upstash sliding-window limit at the edge (~1h) and honeypot-trip monitoring. **(2) Free-tier ceilings, not architecture** — Supabase's micro instance and Vercel Hobby fair-use throttle long before the schema does; upgrade both before the weekend, zero code changes. **(3) `ref_code` collision retries** under burst — bounded at 3 attempts with 8 chars of entropy, a non-event, but log retry counts to see it coming. That was the intent: the boring parts scale, so the first thing at risk is confidence in the numbers — and it's the first thing the roadmap hardens.
