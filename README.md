@@ -31,17 +31,20 @@ SEO reasoning is in [`docs/PART2.md`](docs/PART2.md).
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Framework | **Next.js 15** (App Router, TS) | SSG gives crawlable HTML + fast mobile load with no client framework tax |
+| Framework | **Next.js 15** (App Router, TS) | Server-rendered, crawlable HTML + fast mobile load with no client framework tax |
 | Styling | **Tailwind CSS v4** | Token-driven, zero runtime CSS |
 | Database | **Supabase (Postgres)** | Managed Postgres + REST; the migration is plain SQL, portable to any Postgres |
 | Validation | **Zod** + a pure phone normalizer | One shared module for client and server, unit-tested |
 | Tests | **Vitest** | Fast, covers the validation + DB-error logic (the write path's heart) |
 | Hosting | **Vercel** | First-class Next.js SSR/SSG + serverless routes |
 
-**Rendering:** the page is statically prerendered; the only server code is one route handler
-(`POST /api/waitlist`). This is what carries the Lighthouse mobile target (≥ 85; the production
-build is fully static, ~119 kB first load). The build intentionally does **not** use
-`output: 'export'`, which would drop the API route.
+**Rendering:** the two localized pages (`/`, `/ar`) are **server-rendered** — a deliberate trade of
+build-time static for i18n correctness, so each locale gets a correct `<html lang>`/`dir` (a
+client-side lang fix would leave crawlers and the browser's translate heuristic seeing the wrong
+language). The HTML is fully crawlable and the client bundle is unchanged (~119 kB first load); the
+SEO files (`sitemap.xml`, `robots.txt`) stay static. The one other server endpoint is the route
+handler (`POST /api/waitlist`). The build intentionally does **not** use `output: 'export'`, which
+would drop the API route. This is what carries the Lighthouse mobile target (≥ 85).
 
 ## Quick start
 

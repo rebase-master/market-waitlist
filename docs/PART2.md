@@ -42,8 +42,10 @@ one-line query for the team and invisible to everyone else.
 
 ## 2. Technical execution
 
-**Architecture (deliberately small).** A statically-prerendered Next.js page + exactly one serverless
-route (`POST /api/waitlist`). No auth, no ORM, no admin app. Supabase Postgres with **RLS deny-all**;
+**Architecture (deliberately small).** A server-rendered Next.js page + exactly one serverless
+route (`POST /api/waitlist`). (The two localized pages are SSR rather than static-exported so each
+locale gets a correct `<html lang>`/`dir` — see the trade-off note below; the HTML is fully crawlable
+either way.) No auth, no ORM, no admin app. Supabase Postgres with **RLS deny-all**;
 the anon key never touches the DB; the route writes with the service-role key. Validation lives in one
 [shared module](../lib/validation.ts) imported by both the client (fast feedback) and the route (the
 real boundary) so they can't drift — 36 Vitest cases cover the Egyptian phone normalizer and the
@@ -64,9 +66,9 @@ single `Organization` + `WebPage` JSON-LD block (`areaServed: Egypt` — deliber
 `robots.txt`, and a bilingual **`hreflang`** pair. `FAQPage` markup is omitted on purpose — Google
 restricted FAQ rich results to gov/health in 2023 — but the FAQ content stays for long-tail.
 
-**Performance.** Fully static, ~119 kB first load, two subset fonts (`next/font`), zero hero images,
-CSS-only gradients. That's what carries the Lighthouse mobile target with room to spare, on the
-low-end Android + patchy-3G reality of the target user.
+**Performance.** ~119 kB first load, two subset fonts (`next/font`), zero hero images, CSS-only
+gradients, server-rendered crawlable HTML. That's what carries the Lighthouse mobile target with room
+to spare, on the low-end Android + patchy-3G reality of the target user.
 
 **Bilingual.** A dictionary-driven page renders both `/` (English) and `/ar` (Arabic, RTL) from one
 set of components — direction via `dir` + CSS logical properties, no duplicated CSS. More on why
@@ -154,6 +156,7 @@ what got **cut** and sequenced:
 | `demand_report` as a SQL view, no dashboard | Chose | The evaluator can run it; a dashboard is UI for a problem we don't have yet. |
 | Supabase over raw Postgres | Chose | Managed Postgres + REST + a plain-SQL migration that's portable anywhere. One innovation token, well spent. |
 | Palette matched to Mal's brand | Chose | Signals brand awareness to the evaluator; executed with restraint so the periwinkle/aurora reads as intentional, not generic pastel-fintech. |
+| SSR for `/` + `/ar` (not static-export) | Chose | A correct per-locale `<html lang>`/`dir` needs the route at render time. Static-exporting both with one hardcoded `lang` let browsers auto-translate the Arabic page into a broken English-in-RTL hybrid. SSR fixes it for crawlers and browsers; the per-request cost on Vercel is negligible. |
 
 **With 2 more hours** (also in the README): rate-limit + `referred_by` validation to protect the
 demand signal; the referral loop's position/live-count on the success screen; analytics events + a
