@@ -19,6 +19,18 @@ captures qualified signups and writes them to Postgres (Supabase).
 
 ---
 
+## Try it live
+
+- **English:** https://market-waitlist.vercel.app
+- **Arabic (RTL):** https://market-waitlist.vercel.app/ar
+
+To try the form, use any valid Egyptian mobile — networks **010 / 011 / 012 / 015**. Copy-paste any of:
+
+| `01012345678` | `01198765432` | `01234567890` | `01555555555` |
+|---|---|---|---|
+
+`+20` / `0020` prefixes also work (`+201012345678`), and spaces/dashes are fine. Email works instead of a phone (either one is required). Submitting the same number twice returns the *same* referral code — that's the dedupe, not an error.
+
 ## Why Egypt
 
 Mal is Abu-Dhabi-based with a stated Middle-East rollout, so Egypt is the market you'd realistically
@@ -151,10 +163,11 @@ DESIGN.md              # design system (tokens, type, rules)
 
 ## Build status
 
-In and verified (production build passes, 36 tests green): scaffold, schema/migration, shared
-validation, page + form with all interaction states, `POST /api/waitlist` with constraint-aware
-dedupe, the full SEO layer (JSON-LD, sitemap, robots, hreflang), and the bilingual **`/ar` Arabic
-RTL route**. Still landing: the **Vercel deploy** (live URL) and the written **`docs/PART2.md`** essay.
+**Complete and deployed.** Verified: scaffold, schema/migration, shared validation (36 tests green),
+page + form with all interaction states, `POST /api/waitlist` with constraint-aware dedupe (tested
+live against Supabase), the full SEO layer (JSON-LD, sitemap, robots, hreflang), the bilingual
+**`/ar` Arabic RTL route**, and the [live Vercel deploy](https://market-waitlist.vercel.app). The
+architecture/SEO/trade-offs write-up is in [`docs/PART2.md`](docs/PART2.md).
 
 ## License
 

@@ -199,7 +199,11 @@ export function WaitlistForm({ content }: { content: FormContent }) {
             className={inputClass}
             placeholder={content.phonePlaceholder}
           />
-          {err('phone') && <FieldError>{err('phone')}</FieldError>}
+          {err('phone') ? (
+            <FieldError>{err('phone')}</FieldError>
+          ) : (
+            <p className="mt-1.5 text-[13px] text-ink-muted">{content.phoneHint}</p>
+          )}
         </div>
 
         <div>

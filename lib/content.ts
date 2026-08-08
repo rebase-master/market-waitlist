@@ -21,6 +21,7 @@ export type FormContent = {
   fullNamePlaceholder: string
   phone: string
   phonePlaceholder: string
+  phoneHint: string
   email: string
   emailOptional: string
   emailPlaceholder: string
@@ -71,6 +72,7 @@ export const EN: Content = {
     fullNamePlaceholder: 'Your name',
     phone: 'Mobile number',
     phonePlaceholder: '010 1234 5678',
+    phoneHint: 'Any Egyptian mobile — 010, 011, 012, or 015 (e.g. 010 1234 5678).',
     email: 'Email',
     emailOptional: '(optional if you gave a number)',
     emailPlaceholder: 'you@email.com',
@@ -168,6 +170,7 @@ export const AR: Content = {
     fullNamePlaceholder: 'اسمك',
     phone: 'رقم الموبايل',
     phonePlaceholder: '010 1234 5678',
+    phoneHint: 'أي رقم موبايل مصري — 010 أو 011 أو 012 أو 015 (مثال: 010 1234 5678).',
     email: 'البريد الإلكتروني',
     emailOptional: '(اختياري إذا أدخلت رقمًا)',
     emailPlaceholder: 'you@email.com',
