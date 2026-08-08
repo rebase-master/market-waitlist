@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { headers } from 'next/headers'
 import { Inter, Outfit } from 'next/font/google'
 import './globals.css'
 
@@ -53,9 +54,18 @@ export const viewport: Viewport = {
   themeColor: '#d0ddee',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Set <html lang>/<dir> per locale so browsers don't mis-detect (and auto-translate)
+  // the Arabic page, and so crawlers/screen readers see the right language.
+  const pathname = (await headers()).get('x-pathname') ?? '/'
+  const isArabic = pathname.startsWith('/ar')
+
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
+    <html
+      lang={isArabic ? 'ar' : 'en'}
+      dir={isArabic ? 'rtl' : 'ltr'}
+      className={`${outfit.variable} ${inter.variable}`}
+    >
       <body>{children}</body>
     </html>
   )
