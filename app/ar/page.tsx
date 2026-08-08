@@ -20,6 +20,10 @@ export const metadata: Metadata = {
     locale: 'ar_EG',
     type: 'website',
   },
+  // This page is already in Arabic — the canonical Arabic version. Tell Chrome/Google
+  // not to auto-translate it (which mangles the RTL layout and mutates <html>); readers
+  // who want another language switch to `/` via the toggle / hreflang.
+  other: { google: 'notranslate' },
 }
 
 export default function ArabicHome() {

@@ -61,10 +61,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isArabic = pathname.startsWith('/ar')
 
   return (
+    // suppressHydrationWarning: browser translators / extensions mutate <html>
+    // attributes (e.g. Chrome Translate adds `translated-ltr` and rewrites `lang`)
+    // before React hydrates. This is the documented remedy for that class of mismatch.
     <html
       lang={isArabic ? 'ar' : 'en'}
       dir={isArabic ? 'rtl' : 'ltr'}
       className={`${outfit.variable} ${inter.variable}`}
+      suppressHydrationWarning
     >
       <body>{children}</body>
     </html>
